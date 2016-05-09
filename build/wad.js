@@ -263,10 +263,8 @@
         context.__connectified__ = true; // Prevent overriding connect more than once
 
         function shimConnect() {
-            var node = Array.prototype.shift.apply(arguments);
-            node = Super.isPrototypeOf ? (Super.isPrototypeOf(node) ? node.input : node) : (node.input || node);
-            arguments = Array.prototype.slice.call(arguments);
-            arguments.unshift(node);
+            var node = arguments[0];
+            arguments[0] = Super.isPrototypeOf ? (Super.isPrototypeOf(node) ? node.input : node) : (node.input || node);
             oconnect.apply(this, arguments);
             return node;
         }
@@ -2289,46 +2287,34 @@
 ;
 
 /** Let's do the vendor-prefix dance. **/
-    var audioContext = window.AudioContext || window.webkitAudioContext;
-    var context      = new audioContext();
-    var MediaStreamHelper = {
-        /*
-	        The browser have to support Promises if the browser supports only the deprecated version of getUserMedia.
-	        There is a polyfill for Promises!
-          Example:
-	          MediaStreamHelper.initialize(window);
-	          getUserMedia({audio: true}).then(function(stream) {}).catch(function(error) {});
-	*/
-		    UNSUPPORT: false,
-		    SUPPORT_STANDARD_VERSION: 1,
-		    SUPPORT_DEPRECATED_VERSION: 2,
-		    isGetUserMediaSupported: function isGetUserMediaSupported(window) {
-				    if(window.navigator.mediaDevices.getUserMedia) return this.SUPPORT_STANDARD_VERSION;
-				    else if(window.navigator.getUserMedia) return this.SUPPORT_DEPRECATED_VERSION;
-				    else
-					    return this.UNSUPPORT;
-			    },
-		    initialize: function initializeMediaStreamHelper(window) {
-				    window.navigator.mediaDevices = window.navigator.mediaDevices || {};
-				    window.navigator.getUserMedia = window.navigator.getUserMedia || window.navigator.webkitGetUserMedia || window.navigator.mozGetUserMedia;
+var audioContext = window.AudioContext || window.webkitAudioContext;
+var context      = new audioContext();
 
-				    var howIsItSupported = this.isGetUserMediaSupported(window);
-				    if(howIsItSupported != this.UNSUPPORT)
-				    {
-					    window.getUserMedia = howIsItSupported == this.SUPPORT_STANDARD_VERSION ?
-						    window.navigator.mediaDevices.getUserMedia.bind(window.navigator.mediaDevices) :
-						    function(constraints) {
-								    return new Promise(function(resolve, reject) {
-										    window.navigator.getUserMedia(constraints, resolve, reject);
-									    });
-							    };
-				    }
-			    }
-	    };
-    MediaStreamHelper.initialize(window);
-    if(window.getUserMedia) console.log("Your browser supports getUserMedia.");
-    else
-        console.log("Your browser does not support getUserMedia.");
+// create a wrapper for old versions of `getUserMedia`
+var getUserMedia = (function(window) {
+    if (window.navigator.mediaDevices && window.navigator.mediaDevices.getUserMedia) {
+        // Browser supports promise based `getUserMedia`
+        return window.navigator.mediaDevices.getUserMedia.bind(window.navigator.mediaDevices);
+    }
+    var navigatorGetUserMedia = window.navigator.getUserMedia || window.navigator.webkitGetUserMedia || window.navigator.mozGetUserMedia;
+    if (navigatorGetUserMedia) {
+        // Browser supports old `getUserMedia` with callbacks.
+        return function(constraints) {
+            return new Promise(function(resolve, reject) {
+                navigatorGetUserMedia.call(window.navigator, constraints, resolve, reject);
+            });
+        };
+    }
+
+    return function() {
+        throw "getUserMedia is unsupported";
+    };
+}(window));
+
+if (getUserMedia)
+    console.log("Your browser supports getUserMedia.");
+else
+    console.log("Your browser does not support getUserMedia.");
 /////////////////////////////////////////
 
 var Wad = (function(){
@@ -3026,23 +3012,50 @@ then finally play the sound by calling playEnv() **/
         if ( arg.callback ) { arg.callback(this); }
         return this;
     };
+
 //////////////////////////////////////////////////////////////////////////////////////////
 
 
-/** Change the volume of a Wad at any time, including during playback **/
+    /** Change the volume of a Wad at any time, including during playback **/
     Wad.prototype.setVolume = function(volume){
         this.defaultVolume = volume;
         if ( this.gain.length > 0 ) { this.gain[0].gain.value = volume; }
         return this;
     };
-/////////////////////////////////////////////////////////////////////////
+
+    /**
+    Change the playback speed of a Wad during playback.
+    inputSpeed is a value of 0 < speed, and is the rate of playback of the audio.
+    E.g. if input speed = 2.0, the playback will be twice as fast
+    **/
+    Wad.prototype.setSpeed = function(inputSpeed) {
+
+        //Check/Save the input
+        var speed;
+        if(inputSpeed && inputSpeed > 0) speed = inputSpeed;
+        else speed = 0;
+
+        //Check if we have a soundsource (Though we always should)
+        if(this.soundSource) {
+
+            //Set the value
+            this.soundSource.playbackRate.value = speed;
+        }
+        else {
+
+            //Inform that there is no delay on the current wad
+            console.log("Sorry, but the wad does not contain a soundSource!");
+        }
+
+        return this;
+    };
 
     Wad.prototype.setDetune = function(detune){
         this.soundSource.detune.value = detune;
         return this;
     };
 
-/** Change the panning of a Wad at any time, including during playback **/
+    /** Change the panning of a Wad at any time, including during playback **/
     Wad.prototype.setPanning = function(panning){
         this.panning.location = panning;
         if ( isArray(panning) && this.panning.type === '3d' && this.panning.node ) {
@@ -3055,6 +3068,40 @@ then finally play the sound by calling playEnv() **/
 
         if ( isArray(panning) ) { this.panning.type = '3d' }
         else if ( typeof panning === 'number' ) { this.panning.type = 'stereo' }
+        return this;
+    };
+
+    /**
+    Change the Reverb of a Wad at any time, including during playback.
+    inputWet is a value of 0 < wetness/gain < 1
+    **/
+    Wad.prototype.setReverb = function(inputWet) {
+
+        //Check/Save the input
+
+        var wet;
+        if(inputWet && inputWet > 0 && inputWet < 1) wet = inputWet;
+        else if(inputWet >= 1) wet = 1;
+        else wet = 0;
+
+        //Check if we have delay
+        if(this.reverb) {
+
+            //Set the value
+            this.reverb.wet = wet;
+
+            //Set the node's value, if it exists
+            if(this.reverb.node) {
+
+                this.reverb.node.wet.gain.value = wet;
+            }
+        }
+        else {
+
+            //Inform that there is no reverb on the current wad
+            console.log("Sorry, but the wad does not contain Reverb!");
+        }
+
         return this;
     };
 
@@ -3074,10 +3121,12 @@ then finally play the sound by calling playEnv() **/
 
         var wet;
         if(inputWet && inputWet > 0 && inputWet < 1) wet = inputWet;
+        else if(inputWet >= 1) wet = 1;
         else wet = 0;
 
         var feedback;
         if(inputFeedback && inputFeedback > 0 && inputFeedback < 1) feedback = inputFeedback;
+        else if(inputFeedback >= 1) feedback = 1;
         else feedback = 0;
 
         //Check if we have delay
@@ -3105,41 +3154,8 @@ then finally play the sound by calling playEnv() **/
         return this;
     };
 
-    /**
-    Change the Reverb of a Wad at any time, including during playback.
-    inputWet is a value of 0 < wetness/gain < 1
-    **/
-    Wad.prototype.setReverb = function(inputWet){
 
-        //Check/Save the input
-
-        var wet;
-        if(inputWet && inputWet > 0 && inputWet < 1) wet = inputWet;
-        else wet = 0;
-
-        //Check if we have delay
-        if(this.reverb) {
-
-            //Set the value
-            this.reverb.wet = wet;
-
-            //Set the node's value, if it exists
-            if(this.reverb.node) {
-
-                this.reverb.node.wet.gain.value = wet;
-            }
-        }
-        else {
-
-            //Inform that there is no reverb on the current wad
-            console.log("Sorry, but the wad does not contain Reverb!");
-        }
-
-        return this;
-    };
-
-
-//////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 
 
 /** If multiple instances of a sound are playing simultaneously, stop() only can stop the most recent one **/
@@ -3706,7 +3722,7 @@ grab it from the defaultImpulse URL **/
     };
     Wad.midiInputs  = [];
 
-    midiMap = function(event){
+    var midiMap = function(event){
         console.log(event.receivedTime, event.data);
         if ( event.data[0] === 144 ) { // 144 means the midi message has note data
             // console.log('note')
