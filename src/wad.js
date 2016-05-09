@@ -868,6 +868,93 @@ then finally play the sound by calling playEnv() **/
         return this;
     };
 
+    /**
+    Change the properties of a fileter in a Wad at any time,
+    including during playback.
+
+        inputType is a string describing the type of filter.
+        The values can be 'highpass', 'lowpass', or 'bandpass'
+
+
+    **/
+    Wad.prototype.setFilterAtIndex = function(inputIndex, inputType, inputFrequency, inputQ, inputEnv){
+
+        //Check/Save the input
+        var index;
+        if(inputIndex && inputIndex <= this.filter);
+
+        var filterType;
+        if(inputType &&
+            (filterType.toLowercase() == 'highpasss' ||
+            filterType.toLowercase() == 'bandpasss' ||
+            filterType.toLowercase() == 'lowpasss')) {
+                filterType = inputType;
+            }
+        else filterType = 'lowpass';
+
+        var freq;
+        if(inputFrequency
+            && inputFrequency > 0
+            && inputFrequency <= 4000) freq = inputFrequency;
+        else freq = 4000;
+
+        var q;
+        if(inputQ
+            && inputQ => 1
+            && inputQ <= 10 ) q = inputQ;
+        else q = 1;
+
+        var env;
+        if(inputEnv &&
+            inputEnv.frequency &&
+            inputEnv.attack &&
+            inputEnv.frequency > 0 &&
+            inputEnv.frequency <= 4000 &&
+            inputEnv.attack >= 0 &&
+            inputEnv.attack <= 1.0) {
+                env =
+            }
+
+
+        var time;
+        if(inputTime && inputTime > 0) time = inputTime;
+        else time = 0;
+
+        var wet;
+        if(inputWet && inputWet > 0 && inputWet < 1) wet = inputWet;
+        else if(inputWet >= 1) wet = 1;
+        else wet = 0;
+
+        var feedback;
+        if(inputFeedback && inputFeedback > 0 && inputFeedback < 1) feedback = inputFeedback;
+        else if(inputFeedback >= 1) feedback = 1;
+        else feedback = 0;
+
+        //Check if we have delay
+        if(this.delay) {
+
+            //Set the value
+            this.delay.delayTime = time;
+            this.delay.wet = wet;
+            this.delay.feedback = feedback;
+
+            //Set the node's value, if it exists
+            if(this.delay.delayNode) {
+
+                this.delay.delayNode.delayNode.delayTime.value = time;
+                this.delay.delayNode.wetNode.gain.value = wet;
+                this.delay.delayNode.feedbackNode.gain.value = feedback;
+            }
+        }
+        else {
+
+            //Inform that there is no delay on the current wad
+            console.log("Sorry, but the wad does not contain delay!");
+        }
+
+        return this;
+    };
+
 
 //////////////////////////////////////////////////////////////////////////////////////////
 
