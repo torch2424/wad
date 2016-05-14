@@ -877,60 +877,63 @@ then finally play the sound by calling playEnv() **/
 
 
     **/
+    //Function to check filter input
+    function checkFilterInput(filterInput) {
+
+        //Check and make sure all input is within bounds
+        if(!filterInput.type ||
+            (filterInput.type.toLowercase() != 'highpasss' &&
+            filterInput.type.toLowercase() != 'bandpasss' &&
+            filterInput.type.toLowercase() != 'lowpasss')) {
+                filterInput.type = 'lowpass';
+        }
+
+        if(!filterInput.frequency
+            || filterInput.frequency < 0
+            || filterInput.frequency > 4000) {
+
+            filterInput.frequency = 4000;
+        }
+
+        if(!filterInput.q
+            || filterInput.q < 1
+            || filterInput.q > 10 ) {
+
+                q = 1;
+        }
+
+        if(!filterInput.env ||
+            !filterInput.env.frequency ||
+            !filterInput.env.attack ||
+            filterInput.env.frequency < 0 ||
+            filterInput.env.frequency > 4000 ||
+            filterInput.env.attack < 0 ||
+            filterInput.env.attack > 1.0) {
+                filterInput.env  = {};
+        }
+
+        //Return the input
+        return filterInput;
+
+    }
+
     Wad.prototype.setFilterAtIndex = function(inputIndex, inputType, inputFrequency, inputQ, inputEnv){
 
-        //Check/Save the input
+        //Grab the index
         var index;
         if(inputIndex && inputIndex <= this.filter);
 
-        var filterType;
-        if(inputType &&
-            (filterType.toLowercase() == 'highpasss' ||
-            filterType.toLowercase() == 'bandpasss' ||
-            filterType.toLowercase() == 'lowpasss')) {
-                filterType = inputType;
-            }
-        else filterType = 'lowpass';
-
-        var freq;
-        if(inputFrequency
-            && inputFrequency > 0
-            && inputFrequency <= 4000) freq = inputFrequency;
-        else freq = 4000;
-
-        var q;
-        if(inputQ
-            && inputQ => 1
-            && inputQ <= 10 ) q = inputQ;
-        else q = 1;
-
-        var env;
-        if(inputEnv &&
-            inputEnv.frequency &&
-            inputEnv.attack &&
-            inputEnv.frequency > 0 &&
-            inputEnv.frequency <= 4000 &&
-            inputEnv.attack >= 0 &&
-            inputEnv.attack <= 1.0) {
-                env =
-            }
+        //Create the filter input, and check it
+        var filterInput = {
+            type: inputType,
+            frequency: inputFrequency,
+            q: inputQ,
+            env: inputEnv
+        };
+        filterInput = checkFilterInput(filterInput);
 
 
-        var time;
-        if(inputTime && inputTime > 0) time = inputTime;
-        else time = 0;
-
-        var wet;
-        if(inputWet && inputWet > 0 && inputWet < 1) wet = inputWet;
-        else if(inputWet >= 1) wet = 1;
-        else wet = 0;
-
-        var feedback;
-        if(inputFeedback && inputFeedback > 0 && inputFeedback < 1) feedback = inputFeedback;
-        else if(inputFeedback >= 1) feedback = 1;
-        else feedback = 0;
-
-        //Check if we have delay
+        //Check if we have a filter at the index
         if(this.delay) {
 
             //Set the value
